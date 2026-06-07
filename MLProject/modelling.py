@@ -1,5 +1,5 @@
 """
-modelling.py  (versi MLProject — Workflow-CI — FIX TOTAL SABOTASE)
+modelling.py  (versi MLProject)
 ──────────────────────────────────────────────────────────────────────────────
 Model Training Pipeline — Diabetes Prediction Dataset
 Dicoding Submission: Membangun Sistem Machine Learning (Tier Advance — Kriteria 3)
@@ -103,11 +103,13 @@ def run_training(data_path: str, repo_owner: str, repo_name: str, dagshub_token:
     log.info("=" * 60)
     log.info(f"[INIT] Connecting to DagsHub: {repo_owner}/{repo_name}")
     
-    # 🎯 KUNCI UTAMA: Paksa gunakan token dari parameter jika tersedia, anti-sabotase
+    # 🎯 FIX MUTLAK: Gunakan token dari parameter terminal, jangan biarkan ditimpa env lain!
     if dagshub_token:
         os.environ["DAGSHUB_TOKEN"] = dagshub_token
-    elif "MLFLOW_TRACKING_PASSWORD" in os.environ and os.environ["MLFLOW_TRACKING_PASSWORD"]:
-        os.environ["DAGSHUB_TOKEN"] = os.environ["MLFLOW_TRACKING_PASSWORD"]
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+        
+    os.environ["MLFLOW_TRACKING_USERNAME"] = repo_owner
+    os.environ["MLFLOW_TRACKING_URI"] = f"https://dagshub.com/{repo_owner}/{repo_name}.mlflow"
 
     dagshub.init(repo_owner=repo_owner, repo_name=repo_name, mlflow=True)
     mlflow.set_experiment(EXPERIMENT)
@@ -162,7 +164,7 @@ def run_training(data_path: str, repo_owner: str, repo_name: str, dagshub_token:
         f.write("  CLASSIFICATION REPORT — Random Forest\n")
         f.write("=" * 55 + "\n\n")
         f.write(report)
-        f.write("\n\Confusion Matrix:\n")
+        f.write("\n\nConfusion Matrix:\n")
         f.write(str(cm))
 
     # ── 6. MLflow Manual Logging ──────────────────────────────────────────────
@@ -204,7 +206,7 @@ def run_training(data_path: str, repo_owner: str, repo_name: str, dagshub_token:
             registered_model_name="DiabetesPrediction-RandomForest",
         )
 
-        model_uri = model_info.model_uri          # runs:/<run_id>/model
+        model_uri = model_info.model_uri
         log.info(f"         Run ID    : {run_id}")
         log.info(f"         Model URI : {model_uri}")
 
@@ -248,5 +250,5 @@ if __name__ == "__main__":
         data_path=args.data,
         repo_owner=args.dagshub_repo_owner,
         repo_name=args.dagshub_repo_name,
-        dagshub_token=args.dagshub_token,  # <-- Dioper langsung ke fungsi
+        dagshub_token=args.dagshub_token, # <-- Dioper langsung masuk memori parameter fungsi
     )

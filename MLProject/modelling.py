@@ -1,5 +1,5 @@
 """
-modelling.py  (versi MLProject)
+modelling.py  (versi MLProject — Workflow-CI — PURE MLFLOW BYPASS OAUTH)
 ──────────────────────────────────────────────────────────────────────────────
 Model Training Pipeline — Diabetes Prediction Dataset
 Dicoding Submission: Membangun Sistem Machine Learning (Tier Advance — Kriteria 3)
@@ -11,7 +11,6 @@ import logging
 import os
 import sys
 
-import dagshub
 import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
@@ -97,21 +96,26 @@ def plot_feature_importance(
 # Main Training Pipeline
 # ──────────────────────────────────────────────────────────────────────────────
 def run_training(data_path: str, repo_owner: str, repo_name: str, dagshub_token: str = "") -> None:
-    # ── 0. DagsHub Init ───────────────────────────────────────────────────────
+    # ── 0. Pure MLflow Tracking Setup (Bypass DagsHub SDK) ───────────────────
     log.info("=" * 60)
     log.info("  DIABETES PREDICTION — TRAINING (Workflow-CI)")
     log.info("=" * 60)
-    log.info(f"[INIT] Connecting to DagsHub: {repo_owner}/{repo_name}")
+    log.info(f"[INIT] Configuring Pure MLflow Auth for DagsHub: {repo_owner}/{repo_name}")
     
-    # 🎯 FIX MUTLAK: Gunakan token dari parameter terminal, jangan biarkan ditimpa env lain!
-    if dagshub_token:
-        os.environ["DAGSHUB_TOKEN"] = dagshub_token
-        os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
-        
-    os.environ["MLFLOW_TRACKING_USERNAME"] = repo_owner
-    os.environ["MLFLOW_TRACKING_URI"] = f"https://dagshub.com/{repo_owner}/{repo_name}.mlflow"
+    # Ambil token dari parameter eksekusi terminal
+    token_aktif = dagshub_token or os.environ.get("DAGSHUB_TOKEN")
+    if not token_aktif:
+        log.error("❌ ERROR: Token DagsHub tidak ditemukan! Proses dihentikan.")
+        sys.exit(1)
 
-    dagshub.init(repo_owner=repo_owner, repo_name=repo_name, mlflow=True)
+    # Inject langsung ke environment variable yang dibaca oleh modul native MLflow
+    tracking_uri = f"https://dagshub.com/{repo_owner}/{repo_name}.mlflow"
+    os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
+    os.environ["MLFLOW_TRACKING_USERNAME"] = repo_owner
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = token_aktif
+
+    # Set tracking via MLflow native API (Sama sekali tidak memicu browser OAuth)
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(EXPERIMENT)
 
     # ── 1. Load Data ──────────────────────────────────────────────────────────
@@ -250,5 +254,5 @@ if __name__ == "__main__":
         data_path=args.data,
         repo_owner=args.dagshub_repo_owner,
         repo_name=args.dagshub_repo_name,
-        dagshub_token=args.dagshub_token, # <-- Dioper langsung masuk memori parameter fungsi
+        dagshub_token=args.dagshub_token,
     )

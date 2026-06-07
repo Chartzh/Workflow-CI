@@ -39,11 +39,15 @@ jobs:
     timeout-minutes: 90
 
     env:
-      # ── DagsHub / MLflow ───────────────────────────────────────────────────
+      # ── DagsHub / MLflow (Ditambahkan DAGSHUB_TOKEN agar lolos headless auth) ──
       DAGSHUB_REPO_OWNER: ${{ secrets.DAGSHUB_USERNAME }}
       DAGSHUB_REPO_NAME:  Workflow-CI
+      DAGSHUB_TOKEN:      ${{ secrets.DAGSHUB_TOKEN }}
       MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
       MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+      
+      # ── Memaksa Runner Menggunakan Node.js 24 Sesuai Regulasi 2026 ──
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       # ── Docker ────────────────────────────────────────────────────────────
       IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/diabetes-prediction
@@ -54,14 +58,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Setup Miniconda (Diwajibkan oleh mlflow run conda) ───────────────
+      # ── 2. Setup Miniconda (Parameter diperbarui agar tidak memicu warning) ──
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.10.14"
           auto-update-conda: true
-          auto-activate-base: true
-          activate-environment: ""
+          auto-activate: true
+          conda-remove-defaults: true
 
       # ── 3. Install MLflow & DagsHub di base environment ────────────────────
       - name: Install MLflow and DagsHub
@@ -79,22 +83,18 @@ jobs:
           mkdir -p ~/.kaggle
           printf '{"username":"%s","key":"%s"}' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json
           chmod 600 ~/.kaggle/kaggle.json
-          # Dataset ditaruh langsung ke dalam folder MLProject
           kaggle datasets download -d iammustafatz/diabetes-prediction-dataset --unzip -p MLProject/
-          echo "✅ Dataset berhasil diunduh ke folder MLProject:"
-          ls -lh MLProject/diabetes_prediction_dataset.csv
+          echo "✅ Dataset berhasil diunduh ke folder MLProject"
 
       # ── 5. Jalankan Preprocessing Otomatis ──────────────────────────────────
       - name: Run preprocessing
         shell: bash -el {0}
         run: |
           pip install pandas numpy scikit-learn
-          # Menjalankan otomasi kriteria 1, output ditaruh langsung ke folder MLProject
           python preprocessing/automate_Rajif-Raditya.py --input MLProject/diabetes_prediction_dataset.csv --output MLProject/diabetes_prediction_preprocessing.csv
-          echo "✅ Preprocessing selesai:"
-          head -2 MLProject/diabetes_prediction_preprocessing.csv
+          echo "✅ Preprocessing selesai"
 
-      # ── 6. Jalankan Retraining via `mlflow run` (Sudah Masuk Folder MLProject) ──
+      # ── 6. Jalankan Retraining via `mlflow run` ─────────────────────────────
       - name: Run MLflow Project (Retraining)
         shell: bash -el {0}
         run: |
@@ -128,7 +128,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ── 10. Build Docker Image dari MLflow Model (Syarat Mutlak Advance) ───
+      # ── 10. Build Docker Image dari MLflow Model ────────────────────────────
       - name: Build Docker image from MLflow model
         shell: bash -el {0}
         run: |
@@ -142,7 +142,6 @@ jobs:
         shell: bash -el {0}
         run: |
           docker tag ${{ env.IMAGE_NAME }}:latest ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker images ${{ env.IMAGE_NAME }}
 
       # ── 12. Push ke Docker Hub ─────────────────────────────────────────────
       - name: Push Docker image to Docker Hub

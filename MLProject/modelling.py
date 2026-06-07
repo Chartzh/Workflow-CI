@@ -1,5 +1,5 @@
 """
-modelling.py  (versi MLProject — Workflow-CI — FIX RUN NOT FOUND)
+modelling.py  (versi MLProject — Workflow-CI — FIX DOCKER PYTHON 3.10)
 ──────────────────────────────────────────────────────────────────────────────
 Model Training Pipeline — Diabetes Prediction Dataset
 Dicoding Submission: Membangun Sistem Machine Learning (Tier Advance — Kriteria 3)
@@ -112,11 +112,9 @@ def run_training(data_path: str, repo_owner: str, repo_name: str, dagshub_token:
     os.environ["MLFLOW_TRACKING_USERNAME"] = repo_owner
     os.environ["MLFLOW_TRACKING_PASSWORD"] = token_aktif
 
-    # 🎯 KUNCI FIX UTAMA: Hapus parent run ID bawaan orchestrator agar tidak memicu RESOURCE_DOES_NOT_EXIST
     if "MLFLOW_RUN_ID" in os.environ:
         del os.environ["MLFLOW_RUN_ID"]
 
-    # Set tracking via MLflow native API
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(EXPERIMENT)
 
@@ -206,10 +204,12 @@ def run_training(data_path: str, repo_owner: str, repo_name: str, dagshub_token:
         mlflow.log_artifact(report_path, artifact_path="evaluation")
 
         # Model
+        # 🎯 KUNCI FIX: Berikan parameter conda_env agar Docker menggunakan Python 3.10+
         model_info = mlflow.sklearn.log_model(
             sk_model=model,
             artifact_path="model",
             registered_model_name="DiabetesPrediction-RandomForest",
+            conda_env="conda.yaml"
         )
 
         model_uri = model_info.model_uri

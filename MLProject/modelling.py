@@ -249,11 +249,17 @@ def parse_args() -> argparse.Namespace:
         help="DagsHub username.")
     parser.add_argument("--dagshub-repo-name", required=True,
         help="Nama repo DagsHub.")
+    parser.add_argument("--dagshub-token", default="",
+        help="Token akses DagsHub untuk otomatisasi headless.") 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    
+    if args.dagshub_token:
+        os.environ["DAGSHUB_TOKEN"] = args.dagshub_token
+        
     run_training(
         data_path=args.data,
         repo_owner=args.dagshub_repo_owner,

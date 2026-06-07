@@ -12,9 +12,12 @@ entry_points:
         type: str
       dagshub-repo-name:
         type: str
+      dagshub-token:
+        type: str
 
     command: >
       python modelling.py
       --data {data}
       --dagshub-repo-owner {dagshub-repo-owner}
       --dagshub-repo-name {dagshub-repo-name}
+      --dagshub-token {dagshub-token}

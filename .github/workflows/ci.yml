@@ -26,7 +26,7 @@ jobs:
       IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/diabetes-prediction
       IMAGE_TAG:  ${{ github.sha }}
 
-      # 🎯 KUNCI FIX UTAMA: Berikan paspor akses DagsHub ke shell utama GitHub runner
+      # ── Paspor Akses DagsHub ke Shell Utama GitHub Runner ──────────────────
       MLFLOW_TRACKING_URI: https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/Workflow-CI.mlflow
       MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
       MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
@@ -85,7 +85,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ── 8. Build Docker Image dari MLflow Model (CLI sekarang bisa akses cloud) ──
+      # ── 8. Patch MLflow Source Code Bug (PyPA Python 3.9 Deprecation Bypass) ───
+      - name: Patch MLflow Docker Template for Python 3.9 Legacy Pip
+        shell: bash -el {0}
+        run: |
+          TARGET_FILE=$(grep -rl "bootstrap.pypa.io/get-pip.py" /usr/share/miniconda/lib/python3.10/site-packages/mlflow/ || true)
+          echo "Target file internal MLflow ditemukan di: $TARGET_FILE"
+          if [ ! -z "$TARGET_FILE" ]; then
+            sed -i 's|bootstrap.pypa.io/get-pip.py|bootstrap.pypa.io/pip/3.9/get-pip.py|g' "$TARGET_FILE"
+            echo "✅ SELESAI: Template Dockerfile MLflow berhasil dipatch ke legacy URL pip 3.9!"
+          else
+            echo "⚠️ WARNING: File tidak ditemukan, lanjut build image..."
+          fi
+
+      # ── 9. Build Docker Image dari MLflow Model ────────────────────────────
       - name: Build Docker image from MLflow model
         shell: bash -el {0}
         run: |
@@ -94,21 +107,21 @@ jobs:
             --model-uri ${{ steps.model_info.outputs.model_uri }} \
             --name ${{ env.IMAGE_NAME }}
 
-      # ── 9. Tag Image dengan SHA dan latest ────────────────────────────────
+      # ── 10. Tag Image dengan SHA dan latest ────────────────────────────────
       - name: Tag Docker image
         shell: bash -el {0}
         run: |
           docker tag ${{ env.IMAGE_NAME }}:latest ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
-      # ── 10. Push ke Docker Hub ─────────────────────────────────────────────
+      # ── 11. Push ke Docker Hub ─────────────────────────────────────────────
       - name: Push Docker image to Docker Hub
         shell: bash -el {0}
         run: |
           docker push ${{ env.IMAGE_NAME }}:latest
           docker push ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          echo "🚀 Image berhasil di-push ke Docker Hub!"
+          echo "🚀 Sukses besar! Image berhasil di-push ke Docker Hub!"
 
-      # ── 11. Upload Metadata sebagai Artifact CI ────────────────────────────
+      # ── 12. Upload Metadata sebagai Artifact CI ────────────────────────────
       - name: Upload training metadata as artifact
         if: always()
         uses: actions/upload-artifact@v4

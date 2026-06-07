@@ -116,6 +116,10 @@ def run_training(data_path: str, repo_owner: str, repo_name: str) -> None:
     log.info("  DIABETES PREDICTION — TRAINING (Workflow-CI)")
     log.info("=" * 60)
     log.info(f"[INIT] Connecting to DagsHub: {repo_owner}/{repo_name}")
+    
+    if "MLFLOW_TRACKING_PASSWORD" in os.environ:
+        os.environ["DAGSHUB_TOKEN"] = os.environ["MLFLOW_TRACKING_PASSWORD"]
+
     dagshub.init(repo_owner=repo_owner, repo_name=repo_name, mlflow=True)
     mlflow.set_experiment(EXPERIMENT)
 

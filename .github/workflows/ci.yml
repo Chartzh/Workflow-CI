@@ -1,0 +1,164 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# .github/workflows/ci.yml
+# GitHub Actions — MLflow Retraining + Docker Build + Push to Docker Hub
+# Dicoding Submission: Membangun Sistem Machine Learning (Tier Advance — Kriteria 3)
+#
+# Trigger : Push ke branch main
+#
+# Alur    :
+#   1. Checkout repo
+#   2. Setup Python + Miniconda
+#   3. Install MLflow & DagsHub
+#   4. Download dataset dari Kaggle
+#   5. Jalankan retraining via `mlflow run .`
+#   6. Baca model_uri.txt hasil training
+#   7. Build Docker image dari model: `mlflow models build-docker`
+#   8. Login & Push image ke Docker Hub
+#
+# Secrets yang dibutuhkan (Settings → Secrets → Actions):
+#   DAGSHUB_USERNAME      : DagsHub username kamu
+#   DAGSHUB_TOKEN         : DagsHub access token (Settings → User Settings → Tokens)
+#   KAGGLE_USERNAME       : Kaggle username
+#   KAGGLE_KEY            : Kaggle API key
+#   DOCKERHUB_USERNAME    : Docker Hub username
+#   DOCKERHUB_TOKEN       : Docker Hub access token (Account Settings → Security)
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: MLflow Retraining & Docker Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  retrain-and-build:
+    name: Retrain Model & Push Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      # ── DagsHub / MLflow ───────────────────────────────────────────────────
+      DAGSHUB_REPO_OWNER: ${{ secrets.DAGSHUB_USERNAME }}
+      DAGSHUB_REPO_NAME:  Workflow-CI
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+
+      # ── Docker ────────────────────────────────────────────────────────────
+      IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/diabetes-prediction
+      IMAGE_TAG:  ${{ github.sha }}
+
+    steps:
+      # ── 1. Checkout Kode ────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Miniconda (Diwajibkan oleh mlflow run conda) ───────────────
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.10.14"
+          auto-update-conda: true
+          auto-activate-base: true
+          activate-environment: ""
+
+      # ── 3. Install MLflow & DagsHub di base environment ────────────────────
+      - name: Install MLflow and DagsHub
+        shell: bash -el {0}
+        run: pip install mlflow==2.19.0 dagshub==0.3.25
+
+      # ── 4. Download Dataset dari Kaggle ─────────────────────────────────────
+      - name: Download dataset from Kaggle
+        shell: bash -el {0}
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          pip install kaggle
+          mkdir -p ~/.kaggle
+          printf '{"username":"%s","key":"%s"}' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+          # Dataset ditaruh langsung ke dalam folder MLProject
+          kaggle datasets download -d iammustafatz/diabetes-prediction-dataset --unzip -p MLProject/
+          echo "✅ Dataset berhasil diunduh ke folder MLProject:"
+          ls -lh MLProject/diabetes_prediction_dataset.csv
+
+      # ── 5. Jalankan Preprocessing Otomatis ──────────────────────────────────
+      - name: Run preprocessing
+        shell: bash -el {0}
+        run: |
+          pip install pandas numpy scikit-learn
+          # Menjalankan otomasi kriteria 1, output ditaruh langsung ke folder MLProject
+          python preprocessing/automate_Rajif-Raditya.py --input MLProject/diabetes_prediction_dataset.csv --output MLProject/diabetes_prediction_preprocessing.csv
+          echo "✅ Preprocessing selesai:"
+          head -2 MLProject/diabetes_prediction_preprocessing.csv
+
+      # ── 6. Jalankan Retraining via `mlflow run` (Sudah Masuk Folder MLProject) ──
+      - name: Run MLflow Project (Retraining)
+        shell: bash -el {0}
+        run: |
+          cd MLProject
+          mlflow run . \
+            --env-manager conda \
+            -P dagshub-repo-owner=${{ secrets.DAGSHUB_USERNAME }} \
+            -P dagshub-repo-name=Workflow-CI \
+            -P data=diabetes_prediction_preprocessing.csv
+
+      # ── 7. Baca Model URI dari file output training ─────────────────────────
+      - name: Read model URI
+        id: model_info
+        shell: bash -el {0}
+        run: |
+          MODEL_URI=$(cat MLProject/model_uri.txt)
+          RUN_ID=$(cat MLProject/run_id.txt)
+          echo "model_uri=$MODEL_URI" >> "$GITHUB_OUTPUT"
+          echo "run_id=$RUN_ID"       >> "$GITHUB_OUTPUT"
+          echo "Model URI : $MODEL_URI"
+          echo "Run ID    : $RUN_ID"
+
+      # ── 8. Setup Docker Buildx ──────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── 9. Login ke Docker Hub ──────────────────────────────────────────────
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # ── 10. Build Docker Image dari MLflow Model (Syarat Mutlak Advance) ───
+      - name: Build Docker image from MLflow model
+        shell: bash -el {0}
+        run: |
+          cd MLProject
+          mlflow models build-docker \
+            --model-uri ${{ steps.model_info.outputs.model_uri }} \
+            --name ${{ env.IMAGE_NAME }}
+
+      # ── 11. Tag Image dengan SHA dan latest ────────────────────────────────
+      - name: Tag Docker image
+        shell: bash -el {0}
+        run: |
+          docker tag ${{ env.IMAGE_NAME }}:latest ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker images ${{ env.IMAGE_NAME }}
+
+      # ── 12. Push ke Docker Hub ─────────────────────────────────────────────
+      - name: Push Docker image to Docker Hub
+        shell: bash -el {0}
+        run: |
+          docker push ${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          echo "🚀 Image berhasil di-push ke Docker Hub!"
+
+      # ── 13. Upload Metadata sebagai Artifact CI ────────────────────────────
+      - name: Upload training metadata as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-metadata
+          path: |
+            MLProject/run_id.txt
+            MLProject/model_uri.txt
+          retention-days: 30

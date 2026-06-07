@@ -1,0 +1,20 @@
+name: diabetes-prediction-workflow
+
+conda_env: conda.yaml
+
+entry_points:
+  main:
+    parameters:
+      data:
+        type: str
+        default: diabetes_prediction_preprocessing.csv
+      dagshub-repo-owner:
+        type: str
+      dagshub-repo-name:
+        type: str
+
+    command: >
+      python modelling.py
+      --data {data}
+      --dagshub-repo-owner {dagshub-repo-owner}
+      --dagshub-repo-name {dagshub-repo-name}

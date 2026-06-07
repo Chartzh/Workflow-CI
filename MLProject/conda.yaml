@@ -1,0 +1,26 @@
+name: diabetes-mlflow-env
+
+channels:
+  - defaults
+  - conda-forge
+
+dependencies:
+  - python=3.10.14
+  - pip=24.0
+
+  # ── Scientific Stack (via conda untuk solver yg lebih stabil) ──────────────
+  - numpy=1.26.4
+  - pandas=2.2.2
+  - scipy=1.13.0
+
+  # ── Visualisasi ──────────────────────────────────────────────────────────────
+  - matplotlib=3.8.4
+  - seaborn=0.13.2
+
+  # ── pip-managed packages ──────────────────────────────────────────────────────
+  - pip:
+    - mlflow==2.19.0
+    - scikit-learn==1.4.2
+    - dagshub==0.3.25
+    - joblib==1.4.2
+    - cloudpickle==3.0.0

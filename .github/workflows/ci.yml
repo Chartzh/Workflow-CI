@@ -19,10 +19,13 @@ jobs:
     timeout-minutes: 90
 
     env:
-      # ── DagsHub / MLflow ───────────────────────────────────────────────────
+      # ── DagsHub / MLflow Configuration ─────────────────────────────────────
       DAGSHUB_REPO_OWNER: ${{ secrets.DAGSHUB_USERNAME }}
       DAGSHUB_REPO_NAME:  Workflow-CI
       DAGSHUB_TOKEN:      ${{ secrets.DAGSHUB_TOKEN }}
+      
+      # 🎯 KUNCI UTAMA: Memaksa MLflow meloloskan password masuk ke dalam sandbox env
+      MLFLOW_TRACKING_URI: https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/Workflow-CI.mlflow
       MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
       MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
       
@@ -38,7 +41,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Setup Miniconda (Gunakan channel resmi agar aman) ────────────────
+      # ── 2. Setup Miniconda ──────────────────────────────────────────────────
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -52,7 +55,7 @@ jobs:
         shell: bash -el {0}
         run: pip install mlflow==2.19.0 dagshub==0.3.25
 
-      # ── 4. Jalankan Retraining via `mlflow run` (Langsung eksekusi file lokal) ──
+      # ── 4. Jalankan Retraining via `mlflow run` ─────────────────────────────
       - name: Run MLflow Project (Retraining)
         shell: bash -el {0}
         run: |

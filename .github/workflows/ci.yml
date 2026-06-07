@@ -38,13 +38,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Setup Miniconda (Ditambahkan channels agar tidak NoChannelsConfiguredError) ──
+      # ── 2. Setup Miniconda (Gunakan channel resmi agar aman) ────────────────
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.10.14"
           auto-update-conda: false
-          channels: "conda-forge,defaults" # <-- Pengunci gerbang download conda
+          channels: "conda-forge,defaults"
           activate-environment: "base"
 
       # ── 3. Install MLflow & DagsHub di base environment ────────────────────
@@ -52,29 +52,7 @@ jobs:
         shell: bash -el {0}
         run: pip install mlflow==2.19.0 dagshub==0.3.25
 
-      # ── 4. Download Dataset dari Kaggle ─────────────────────────────────────
-      - name: Download dataset from Kaggle
-        shell: bash -el {0}
-        env:
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
-          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-        run: |
-          pip install kaggle
-          mkdir -p ~/.kaggle
-          printf '{"username":"%s","key":"%s"}' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json
-          chmod 600 ~/.kaggle/kaggle.json
-          kaggle datasets download -d iammustafatz/diabetes-prediction-dataset --unzip -p MLProject/
-          echo "✅ Dataset berhasil diunduh ke folder MLProject"
-
-      # ── 5. Jalankan Preprocessing Otomatis ──────────────────────────────────
-      - name: Run preprocessing
-        shell: bash -el {0}
-        run: |
-          pip install pandas numpy scikit-learn
-          python preprocessing/automate_Rajif-Raditya.py --input MLProject/diabetes_prediction_dataset.csv --output MLProject/diabetes_prediction_preprocessing.csv
-          echo "✅ Preprocessing selesai"
-
-      # ── 6. Jalankan Retraining via `mlflow run` ─────────────────────────────
+      # ── 4. Jalankan Retraining via `mlflow run` (Langsung eksekusi file lokal) ──
       - name: Run MLflow Project (Retraining)
         shell: bash -el {0}
         run: |
@@ -85,7 +63,7 @@ jobs:
             -P dagshub-repo-name=Workflow-CI \
             -P data=diabetes_prediction_preprocessing.csv
 
-      # ── 7. Baca Model URI dari file output training ─────────────────────────
+      # ── 5. Baca Model URI dari file output training ─────────────────────────
       - name: Read model URI
         id: model_info
         shell: bash -el {0}
@@ -97,18 +75,18 @@ jobs:
           echo "Model URI : $MODEL_URI"
           echo "Run ID    : $RUN_ID"
 
-      # ── 8. Setup Docker Buildx ──────────────────────────────────────────────
+      # ── 6. Setup Docker Buildx ──────────────────────────────────────────────
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ── 9. Login ke Docker Hub ──────────────────────────────────────────────
+      # ── 7. Login ke Docker Hub ──────────────────────────────────────────────
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ── 10. Build Docker Image dari MLflow Model ────────────────────────────
+      # ── 8. Build Docker Image dari MLflow Model ────────────────────────────
       - name: Build Docker image from MLflow model
         shell: bash -el {0}
         run: |
@@ -117,13 +95,13 @@ jobs:
             --model-uri ${{ steps.model_info.outputs.model_uri }} \
             --name ${{ env.IMAGE_NAME }}
 
-      # ── 11. Tag Image dengan SHA dan latest ────────────────────────────────
+      # ── 9. Tag Image dengan SHA dan latest ────────────────────────────────
       - name: Tag Docker image
         shell: bash -el {0}
         run: |
           docker tag ${{ env.IMAGE_NAME }}:latest ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
-      # ── 12. Push ke Docker Hub ─────────────────────────────────────────────
+      # ── 10. Push ke Docker Hub ─────────────────────────────────────────────
       - name: Push Docker image to Docker Hub
         shell: bash -el {0}
         run: |
@@ -131,7 +109,7 @@ jobs:
           docker push ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           echo "🚀 Image berhasil di-push ke Docker Hub!"
 
-      # ── 13. Upload Metadata sebagai Artifact CI ────────────────────────────
+      # ── 11. Upload Metadata sebagai Artifact CI ────────────────────────────
       - name: Upload training metadata as artifact
         if: always()
         uses: actions/upload-artifact@v4

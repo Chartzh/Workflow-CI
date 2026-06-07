@@ -1,22 +1,8 @@
 """
-modelling.py  (versi MLProject — Workflow-CI)
+modelling.py  (versi MLProject — Workflow-CI — FIX TOTAL SABOTASE)
 ──────────────────────────────────────────────────────────────────────────────
 Model Training Pipeline — Diabetes Prediction Dataset
 Dicoding Submission: Membangun Sistem Machine Learning (Tier Advance — Kriteria 3)
-
-File ini adalah entry point untuk MLflow Project (MLProject).
-Setelah training selesai, Run ID dan Model URI ditulis ke file
-`run_id.txt` dan `model_uri.txt` di working directory — file ini
-dibaca oleh GitHub Actions untuk langkah `mlflow build-docker`.
-
-Usage (langsung):
-    python modelling.py \
-        --data  diabetes_prediction_preprocessing.csv \
-        --dagshub-repo-owner <username> \
-        --dagshub-repo-name  <repo-name>
-
-Usage (via MLflow Project):
-    mlflow run . -P dagshub-repo-owner=<user> -P dagshub-repo-name=<repo>
 ──────────────────────────────────────────────────────────────────────────────
 """
 
@@ -110,14 +96,17 @@ def plot_feature_importance(
 # ──────────────────────────────────────────────────────────────────────────────
 # Main Training Pipeline
 # ──────────────────────────────────────────────────────────────────────────────
-def run_training(data_path: str, repo_owner: str, repo_name: str) -> None:
+def run_training(data_path: str, repo_owner: str, repo_name: str, dagshub_token: str = "") -> None:
     # ── 0. DagsHub Init ───────────────────────────────────────────────────────
     log.info("=" * 60)
     log.info("  DIABETES PREDICTION — TRAINING (Workflow-CI)")
     log.info("=" * 60)
     log.info(f"[INIT] Connecting to DagsHub: {repo_owner}/{repo_name}")
     
-    if "MLFLOW_TRACKING_PASSWORD" in os.environ:
+    # 🎯 KUNCI UTAMA: Paksa gunakan token dari parameter jika tersedia, anti-sabotase
+    if dagshub_token:
+        os.environ["DAGSHUB_TOKEN"] = dagshub_token
+    elif "MLFLOW_TRACKING_PASSWORD" in os.environ and os.environ["MLFLOW_TRACKING_PASSWORD"]:
         os.environ["DAGSHUB_TOKEN"] = os.environ["MLFLOW_TRACKING_PASSWORD"]
 
     dagshub.init(repo_owner=repo_owner, repo_name=repo_name, mlflow=True)
@@ -168,12 +157,12 @@ def run_training(data_path: str, repo_owner: str, repo_name: str) -> None:
 
     plot_confusion_matrix(cm, cm_path)
     plot_feature_importance(model.feature_importances_, feature_names, fi_path)
-    with open(report_path, "w") as f:
+    with open(report_path, "w", encoding="utf-8") as f:
         f.write("=" * 55 + "\n")
         f.write("  CLASSIFICATION REPORT — Random Forest\n")
         f.write("=" * 55 + "\n\n")
         f.write(report)
-        f.write("\n\nConfusion Matrix:\n")
+        f.write("\n\Confusion Matrix:\n")
         f.write(str(cm))
 
     # ── 6. MLflow Manual Logging ──────────────────────────────────────────────
@@ -220,7 +209,6 @@ def run_training(data_path: str, repo_owner: str, repo_name: str) -> None:
         log.info(f"         Model URI : {model_uri}")
 
     # ── 7. Tulis run_id.txt & model_uri.txt ──────────────────────────────────
-    # File ini dibaca oleh GitHub Actions untuk `mlflow build-docker`
     with open("run_id.txt", "w") as f:
         f.write(run_id)
     with open("model_uri.txt", "w") as f:
@@ -256,12 +244,9 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    
-    if args.dagshub_token:
-        os.environ["DAGSHUB_TOKEN"] = args.dagshub_token
-        
     run_training(
         data_path=args.data,
         repo_owner=args.dagshub_repo_owner,
         repo_name=args.dagshub_repo_name,
+        dagshub_token=args.dagshub_token,  # <-- Dioper langsung ke fungsi
     )

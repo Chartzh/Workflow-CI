@@ -1,5 +1,5 @@
 """
-modelling.py  (versi MLProject — Workflow-CI — PURE MLFLOW BYPASS OAUTH)
+modelling.py  (versi MLProject — Workflow-CI — FIX RUN NOT FOUND)
 ──────────────────────────────────────────────────────────────────────────────
 Model Training Pipeline — Diabetes Prediction Dataset
 Dicoding Submission: Membangun Sistem Machine Learning (Tier Advance — Kriteria 3)
@@ -96,25 +96,27 @@ def plot_feature_importance(
 # Main Training Pipeline
 # ──────────────────────────────────────────────────────────────────────────────
 def run_training(data_path: str, repo_owner: str, repo_name: str, dagshub_token: str = "") -> None:
-    # ── 0. Pure MLflow Tracking Setup (Bypass DagsHub SDK) ───────────────────
+    # ── 0. Pure MLflow Tracking Setup ────────────────────────────────────────
     log.info("=" * 60)
     log.info("  DIABETES PREDICTION — TRAINING (Workflow-CI)")
     log.info("=" * 60)
     log.info(f"[INIT] Configuring Pure MLflow Auth for DagsHub: {repo_owner}/{repo_name}")
     
-    # Ambil token dari parameter eksekusi terminal
     token_aktif = dagshub_token or os.environ.get("DAGSHUB_TOKEN")
     if not token_aktif:
         log.error("❌ ERROR: Token DagsHub tidak ditemukan! Proses dihentikan.")
         sys.exit(1)
 
-    # Inject langsung ke environment variable yang dibaca oleh modul native MLflow
     tracking_uri = f"https://dagshub.com/{repo_owner}/{repo_name}.mlflow"
     os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
     os.environ["MLFLOW_TRACKING_USERNAME"] = repo_owner
     os.environ["MLFLOW_TRACKING_PASSWORD"] = token_aktif
 
-    # Set tracking via MLflow native API (Sama sekali tidak memicu browser OAuth)
+    # 🎯 KUNCI FIX UTAMA: Hapus parent run ID bawaan orchestrator agar tidak memicu RESOURCE_DOES_NOT_EXIST
+    if "MLFLOW_RUN_ID" in os.environ:
+        del os.environ["MLFLOW_RUN_ID"]
+
+    # Set tracking via MLflow native API
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(EXPERIMENT)
 

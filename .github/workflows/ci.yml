@@ -2,26 +2,6 @@
 # .github/workflows/ci.yml
 # GitHub Actions — MLflow Retraining + Docker Build + Push to Docker Hub
 # Dicoding Submission: Membangun Sistem Machine Learning (Tier Advance — Kriteria 3)
-#
-# Trigger : Push ke branch main
-#
-# Alur    :
-#   1. Checkout repo
-#   2. Setup Python + Miniconda
-#   3. Install MLflow & DagsHub
-#   4. Download dataset dari Kaggle
-#   5. Jalankan retraining via `mlflow run .`
-#   6. Baca model_uri.txt hasil training
-#   7. Build Docker image dari model: `mlflow models build-docker`
-#   8. Login & Push image ke Docker Hub
-#
-# Secrets yang dibutuhkan (Settings → Secrets → Actions):
-#   DAGSHUB_USERNAME      : DagsHub username kamu
-#   DAGSHUB_TOKEN         : DagsHub access token (Settings → User Settings → Tokens)
-#   KAGGLE_USERNAME       : Kaggle username
-#   KAGGLE_KEY            : Kaggle API key
-#   DOCKERHUB_USERNAME    : Docker Hub username
-#   DOCKERHUB_TOKEN       : Docker Hub access token (Account Settings → Security)
 # ──────────────────────────────────────────────────────────────────────────────
 
 name: MLflow Retraining & Docker Build
@@ -39,14 +19,14 @@ jobs:
     timeout-minutes: 90
 
     env:
-      # ── DagsHub / MLflow (Ditambahkan DAGSHUB_TOKEN agar lolos headless auth) ──
+      # ── DagsHub / MLflow ───────────────────────────────────────────────────
       DAGSHUB_REPO_OWNER: ${{ secrets.DAGSHUB_USERNAME }}
       DAGSHUB_REPO_NAME:  Workflow-CI
       DAGSHUB_TOKEN:      ${{ secrets.DAGSHUB_TOKEN }}
       MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
       MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
       
-      # ── Memaksa Runner Menggunakan Node.js 24 Sesuai Regulasi 2026 ──
+      # ── Memaksa Runner Menggunakan Node.js 24 Sesuai Regulasi Terbaru ──
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       # ── Docker ────────────────────────────────────────────────────────────
@@ -58,14 +38,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Setup Miniconda (Parameter diperbarui agar tidak memicu warning) ──
+      # ── 2. Setup Miniconda (Ditambahkan channels agar tidak NoChannelsConfiguredError) ──
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.10.14"
           auto-update-conda: false
-          auto-activate: true
-          conda-remove-defaults: true
+          channels: "conda-forge,defaults" # <-- Pengunci gerbang download conda
+          activate-environment: "base"
 
       # ── 3. Install MLflow & DagsHub di base environment ────────────────────
       - name: Install MLflow and DagsHub

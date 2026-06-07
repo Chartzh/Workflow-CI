@@ -85,18 +85,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ── 8. Patch MLflow Source Code Bug (PyPA Python 3.9 Deprecation Bypass) ───
+      # ── 8. Patch MLflow Source Code Bug (Hanya sasar file *.py, anti-eror cache) ───
       - name: Patch MLflow Docker Template for Python 3.9 Legacy Pip
         shell: bash -el {0}
         run: |
-          TARGET_FILE=$(grep -rl "bootstrap.pypa.io/get-pip.py" /usr/share/miniconda/lib/python3.10/site-packages/mlflow/ || true)
-          echo "Target file internal MLflow ditemukan di: $TARGET_FILE"
-          if [ ! -z "$TARGET_FILE" ]; then
-            sed -i 's|bootstrap.pypa.io/get-pip.py|bootstrap.pypa.io/pip/3.9/get-pip.py|g' "$TARGET_FILE"
-            echo "✅ SELESAI: Template Dockerfile MLflow berhasil dipatch ke legacy URL pip 3.9!"
-          else
-            echo "⚠️ WARNING: File tidak ditemukan, lanjut build image..."
-          fi
+          echo "Mencari file source code MLflow..."
+          grep -rl --include="*.py" "bootstrap.pypa.io/get-pip.py" /usr/share/miniconda/lib/python3.10/site-packages/mlflow/ | while read -r file; do
+            echo "🎯 Patching file: $file"
+            sed -i 's|bootstrap.pypa.io/get-pip.py|bootstrap.pypa.io/pip/3.9/get-pip.py|g' "$file"
+          done
+          echo "✅ SELESAI: Patching url legacy pip sukses diterapkan!"
 
       # ── 9. Build Docker Image dari MLflow Model ────────────────────────────
       - name: Build Docker image from MLflow model
